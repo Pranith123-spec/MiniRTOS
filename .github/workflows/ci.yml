@@ -28,15 +28,15 @@ jobs:
             -Iinclude \
             -o scheduler
 
-      - name: Build unit tests
+            - name: Build unit tests
         run: |
           gcc -Wall -Wextra -Wpedantic \
             tests/test_scheduler.c \
             src/scheduler.c \
             -Iinclude \
-            -o tests \
+            -o test_runner \
             -lm
 
       - name: Run unit tests
         run: |
-          ./tests
+          ./test_runner
