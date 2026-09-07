@@ -1,0 +1,23 @@
+# Compiled executables
+
+*.exe
+
+# Object files
+
+*.o
+*.obj
+
+# Build directories
+
+build/
+bin/
+
+# IDE/editor files
+
+.vscode/
+.idea/
+
+# Temporary files
+
+*.tmp
+*.log
