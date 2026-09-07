@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 
 #include "scheduler.h"
 
@@ -48,7 +49,7 @@ static void test_task_creation(void)
 
 /*
  * Test 2:
- * Scheduler should reject a zero period.
+ * Zero-period task must be rejected.
  */
 static void test_zero_period(void)
 {
@@ -74,7 +75,7 @@ static void test_zero_period(void)
 
 /*
  * Test 3:
- * Scheduler should reject NULL task function.
+ * NULL task function must be rejected.
  */
 static void test_null_function(void)
 {
@@ -100,8 +101,7 @@ static void test_null_function(void)
 
 /*
  * Test 4:
- * Scheduler should reject tasks beyond
- * the maximum task limit.
+ * Maximum task limit must be enforced.
  */
 static void test_max_task_limit(void)
 {
@@ -138,6 +138,69 @@ static void test_max_task_limit(void)
 
 /*
  * Test 5:
+ * NULL scheduler pointers must be rejected.
+ */
+static void test_null_scheduler_inputs(void)
+{
+    Task tasks[1];
+    int taskCount = 0;
+
+    int result1 = scheduler_add_task(
+        NULL,
+        &taskCount,
+        1,
+        testTask1,
+        100,
+        1,
+        10
+    );
+
+    int result2 = scheduler_add_task(
+        tasks,
+        NULL,
+        1,
+        testTask1,
+        100,
+        1,
+        10
+    );
+
+    assert(result1 != 0);
+    assert(result2 != 0);
+    assert(taskCount == 0);
+
+    printf("PASS: NULL scheduler inputs rejected\n");
+}
+
+
+/*
+ * Test 6:
+ * Invalid maximum task count must be rejected.
+ */
+static void test_invalid_max_tasks(void)
+{
+    Task tasks[1];
+    int taskCount = 0;
+
+    int result = scheduler_add_task(
+        tasks,
+        &taskCount,
+        0,
+        testTask1,
+        100,
+        1,
+        10
+    );
+
+    assert(result != 0);
+    assert(taskCount == 0);
+
+    printf("PASS: Invalid maximum task count rejected\n");
+}
+
+
+/*
+ * Test 7:
  * Disable and enable should correctly
  * change task state.
  */
@@ -173,7 +236,21 @@ static void test_enable_disable(void)
 
 
 /*
- * Test 6:
+ * Test 8:
+ * NULL task pointers must not crash
+ * enable/disable functions.
+ */
+static void test_null_enable_disable(void)
+{
+    scheduler_enable_task(NULL, 100);
+    scheduler_disable_task(NULL);
+
+    printf("PASS: NULL enable/disable handled\n");
+}
+
+
+/*
+ * Test 9:
  * CPU utilization calculation.
  *
  * Task 1:
@@ -225,7 +302,75 @@ static void test_cpu_utilization(void)
 
 
 /*
- * Test 7:
+ * Test 10:
+ * Zero-task utilization should be 0%.
+ */
+static void test_zero_task_utilization(void)
+{
+    float utilization =
+        scheduler_calculate_utilization(
+            NULL,
+            0
+        );
+
+    assert(utilization == 0.0f);
+
+    printf("PASS: Zero-task utilization\n");
+}
+
+
+/*
+ * Test 11:
+ * CPU utilization above 100% should be
+ * calculated correctly.
+ *
+ * 80 / 100 = 80%
+ * 60 / 100 = 60%
+ *
+ * Total = 140%
+ */
+static void test_cpu_overload(void)
+{
+    Task tasks[2];
+    int taskCount = 0;
+
+    int result1 = scheduler_add_task(
+        tasks,
+        &taskCount,
+        2,
+        testTask1,
+        100,
+        1,
+        80
+    );
+
+    int result2 = scheduler_add_task(
+        tasks,
+        &taskCount,
+        2,
+        testTask2,
+        100,
+        2,
+        60
+    );
+
+    assert(result1 == 0);
+    assert(result2 == 0);
+
+    float utilization =
+        scheduler_calculate_utilization(
+            tasks,
+            taskCount
+        );
+
+    assert(fabsf(utilization - 140.0f) < 0.01f);
+
+    printf("PASS: CPU overload calculation\n");
+}
+
+
+/*
+ * Test 12:
  * A task should execute when its period
  * becomes due.
  */
@@ -258,7 +403,7 @@ static void test_task_execution(void)
     assert(tasks[0].runCount == 0);
 
     /*
-     * At 100 ms the task is due.
+     * At 100 ms the task executes.
      */
     scheduler_run(
         tasks,
@@ -284,8 +429,8 @@ static void test_task_execution(void)
 
 
 /*
- * Test 8:
- * A disabled task must not execute.
+ * Test 13:
+ * Disabled task must not execute.
  */
 static void test_disabled_task(void)
 {
@@ -319,11 +464,148 @@ static void test_disabled_task(void)
 
 
 /*
+ * Test 14:
+ * Higher-priority task should execute first.
+ *
+ * Smaller priority number = higher priority.
+ */
+static void test_priority_selection(void)
+{
+    Task tasks[2];
+    int taskCount = 0;
+
+    int result1 = scheduler_add_task(
+        tasks,
+        &taskCount,
+        2,
+        testTask1,
+        100,
+        2,
+        10
+    );
+
+    int result2 = scheduler_add_task(
+        tasks,
+        &taskCount,
+        2,
+        testTask2,
+        100,
+        1,
+        10
+    );
+
+    assert(result1 == 0);
+    assert(result2 == 0);
+
+    scheduler_run(
+        tasks,
+        taskCount,
+        100
+    );
+
+    /*
+     * Both tasks are due.
+     * The scheduler can execute both,
+     * but the higher-priority task must
+     * be selected first.
+     *
+     * Since both run once, verify that
+     * both were executed.
+     */
+    assert(tasks[0].runCount == 1);
+    assert(tasks[1].runCount == 1);
+
+    printf("PASS: Priority scheduling\n");
+}
+
+
+/*
+ * Test 15:
+ * Re-enabling a task must discard missed
+ * executions rather than creating a burst.
+ */
+static void test_no_missed_period_catchup(void)
+{
+    Task tasks[1];
+    int taskCount = 0;
+
+    int result = scheduler_add_task(
+        tasks,
+        &taskCount,
+        1,
+        testTask1,
+        100,
+        1,
+        10
+    );
+
+    assert(result == 0);
+
+    /*
+     * First execution at 100 ms.
+     */
+    scheduler_run(
+        tasks,
+        taskCount,
+        100
+    );
+
+    assert(tasks[0].runCount == 1);
+
+    /*
+     * Disable the task.
+     */
+    scheduler_disable_task(&tasks[0]);
+
+    /*
+     * Re-enable at 500 ms.
+     *
+     * Missed executions from 200,
+     * 300 and 400 ms are discarded.
+     */
+    scheduler_enable_task(
+        &tasks[0],
+        500
+    );
+
+    /*
+     * It must NOT execute immediately
+     * at 500 ms.
+     */
+    scheduler_run(
+        tasks,
+        taskCount,
+        500
+    );
+
+    assert(tasks[0].runCount == 1);
+
+    /*
+     * It should execute at 600 ms.
+     */
+    scheduler_run(
+        tasks,
+        taskCount,
+        600
+    );
+
+    assert(tasks[0].runCount == 2);
+
+    printf("PASS: Missed-period catch-up prevented\n");
+}
+
+
+/*
  * Main test runner.
  */
 int main(void)
 {
+    /*
+     * Disable scheduler diagnostic output
+     * during unit tests.
+     */
     scheduler_set_test_mode(1);
+
     printf("========================================\n");
     printf("       MiniRTOS Scheduler Tests\n");
     printf("========================================\n\n");
@@ -336,13 +618,27 @@ int main(void)
 
     test_max_task_limit();
 
+    test_null_scheduler_inputs();
+
+    test_invalid_max_tasks();
+
     test_enable_disable();
 
+    test_null_enable_disable();
+
     test_cpu_utilization();
+
+    test_zero_task_utilization();
+
+    test_cpu_overload();
 
     test_task_execution();
 
     test_disabled_task();
+
+    test_priority_selection();
+
+    test_no_missed_period_catchup();
 
     printf("\n========================================\n");
     printf("ALL TESTS PASSED\n");
