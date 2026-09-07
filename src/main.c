@@ -9,8 +9,16 @@ int main(void)
     Task tasks[MAX_TASKS];
 
     int taskCount = 0;
+    int result;
 
-    scheduler_add_task(
+    /*
+     * Add LED Task.
+     *
+     * Period      = 500 ms
+     * Priority    = 2
+     * Execution   = 5 ms
+     */
+    result = scheduler_add_task(
         tasks,
         &taskCount,
         MAX_TASKS,
@@ -20,7 +28,24 @@ int main(void)
         5
     );
 
-    scheduler_add_task(
+    if (result != 0)
+    {
+        printf(
+            "ERROR: Failed to add LED task. Code: %d\n",
+            result
+        );
+
+        return 1;
+    }
+
+    /*
+     * Add Sensor Task.
+     *
+     * Period      = 100 ms
+     * Priority    = 1
+     * Execution   = 20 ms
+     */
+    result = scheduler_add_task(
         tasks,
         &taskCount,
         MAX_TASKS,
@@ -30,7 +55,24 @@ int main(void)
         20
     );
 
-    scheduler_add_task(
+    if (result != 0)
+    {
+        printf(
+            "ERROR: Failed to add Sensor task. Code: %d\n",
+            result
+        );
+
+        return 1;
+    }
+
+    /*
+     * Add UART Task.
+     *
+     * Period      = 1000 ms
+     * Priority    = 3
+     * Execution   = 30 ms
+     */
+    result = scheduler_add_task(
         tasks,
         &taskCount,
         MAX_TASKS,
@@ -40,51 +82,117 @@ int main(void)
         30
     );
 
-    float utilization;
+    if (result != 0)
+    {
+        printf(
+            "ERROR: Failed to add UART task. Code: %d\n",
+            result
+        );
 
-    utilization = scheduler_calculate_utilization(
-      tasks,
-      taskCount
-);
+        return 1;
+    }
 
-printf("CPU Utilization: %.2f%%\n\n", utilization);
+    /*
+     * Calculate CPU utilization.
+     */
+    float utilization =
+        scheduler_calculate_utilization(
+            tasks,
+            taskCount
+        );
 
-if(utilization > 100.0f){
-    printf("WaARNING: CPU OVERLOADED!\n");
-}
-else
-{
-   printf("CPU LOAD is within limit.\n");
-}
-printf("\n");
+    printf(
+        "CPU Utilization: %.2f%%\n\n",
+        utilization
+    );
+
+    /*
+     * Check CPU load.
+     */
+    if (utilization > 100.0f)
+    {
+        printf(
+            "WARNING: CPU OVERLOADED!\n\n"
+        );
+    }
+    else
+    {
+        printf(
+            "CPU LOAD is within limit.\n\n"
+        );
+    }
+
+    /*
+     * Simulated system clock.
+     */
     unsigned int systemTime = 0;
 
+    /*
+     * Run scheduler from 0 to 2000 ms.
+     */
     while (systemTime <= 2000)
     {
-        if(systemTime == 1000)
+        /*
+         * Disable Sensor Task at 1000 ms.
+         */
+        if (systemTime == 1000)
         {
-            printf("\n---Disabling Sensor Task ---\n");
-            scheduler_disable_task(&tasks[1]);
+            printf(
+                "---Disabling Sensor Task ---\n"
+            );
+
+            scheduler_disable_task(
+                &tasks[1]
+            );
         }
 
-        if(systemTime == 1500)
+        /*
+         * Enable Sensor Task at 1500 ms.
+         *
+         * Missed executions are discarded.
+         */
+        if (systemTime == 1500)
         {
-            printf("\n---Enabling Sensor Task ---\n");
-            tasks[1].lastRun = systemTime;
-            scheduler_enable_task(&tasks[1]);
+            printf(
+                "\n---Enabling Sensor Task ---\n"
+            );
+
+            scheduler_enable_task(
+                &tasks[1],
+                systemTime
+            );
         }
+
+        /*
+         * Run scheduler.
+         */
         scheduler_run(
             tasks,
             taskCount,
             systemTime
         );
 
+        /*
+         * Advance simulated clock
+         * by 100 ms.
+         */
         systemTime += 100;
     }
+
+    /*
+     * Print task statistics.
+     */
     printf("\nTask Statistics:\n");
-    for(int i=0; i<taskCount; i++)
+
+    for (int i = 0;
+         i < taskCount;
+         i++)
     {
-        printf("Task %d executed %u times\n", i+1, tasks[i].runCount);
+        printf(
+            "Task %d executed %u times\n",
+            i + 1,
+            tasks[i].runCount
+        );
     }
 
     return 0;

@@ -1,7 +1,6 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
-
 #define MAX_TASKS_PER_TICK 10
 
 typedef void (*TaskFunction)(void);
@@ -15,11 +14,15 @@ typedef enum
 typedef struct
 {
     TaskFunction function;
+
     unsigned int period;
     unsigned int lastRun;
+
     unsigned int priority;
     unsigned int executionTime;
+
     unsigned int runCount;
+
     TaskState state;
 
 } Task;
@@ -40,12 +43,18 @@ void scheduler_run(
     unsigned int systemTime
 );
 
-void scheduler_enable_task(Task *task);
+void scheduler_enable_task(
+    Task *task,
+    unsigned int systemTime
+);
+
 void scheduler_disable_task(Task *task);
 
 float scheduler_calculate_utilization(
     Task tasks[],
     int taskCount
 );
+
+void scheduler_set_test_mode(int enabled);
 
 #endif
